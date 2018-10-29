@@ -12,6 +12,7 @@
 
 static bool waiting = true;
 static bool addedJsLoadErrorObserver = false;
+UIView *splashScreen = nil;
 
 @implementation RNSplashScreen
 - (dispatch_queue_t)methodQueue{
@@ -20,22 +21,33 @@ static bool addedJsLoadErrorObserver = false;
 RCT_EXPORT_MODULE(SplashScreen)
 
 + (void)show {
-    if (!addedJsLoadErrorObserver) {
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(jsLoadError:) name:RCTJavaScriptDidFailToLoadNotification object:nil];
-        addedJsLoadErrorObserver = true;
-    }
-
-    while (waiting) {
-        NSDate* later = [NSDate dateWithTimeIntervalSinceNow:0.1];
-        [[NSRunLoop mainRunLoop] runUntilDate:later];
+    if (!waiting) {
+        NSArray *objects = [[NSBundle mainBundle] loadNibNamed:@"LaunchScreen" owner:self options:nil];
+        splashScreen = [objects objectAtIndex:0];
+        splashScreen.center = [[UIApplication sharedApplication].keyWindow convertPoint:[UIApplication sharedApplication].keyWindow.center fromWindow:[UIApplication sharedApplication].keyWindow];
+        [[UIApplication sharedApplication].keyWindow addSubview:splashScreen];
+    } else {
+        if (!addedJsLoadErrorObserver) {
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(jsLoadError:) name:RCTJavaScriptDidFailToLoadNotification object:nil];
+            addedJsLoadErrorObserver = true;
+        }
+        
+        while (waiting) {
+            NSDate* later = [NSDate dateWithTimeIntervalSinceNow:0.1];
+            [[NSRunLoop mainRunLoop] runUntilDate:later];
+        }
     }
 }
 
 + (void)hide {
-    dispatch_async(dispatch_get_main_queue(),
-                   ^{
-                       waiting = false;
-                   });
+    if (waiting) {
+        dispatch_async(dispatch_get_main_queue(),
+                       ^{
+                           waiting = false;
+                       });
+    } else {
+        [splashScreen removeFromSuperview];
+    }
 }
 
 + (void) jsLoadError:(NSNotification*)notification
