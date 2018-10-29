@@ -12,7 +12,7 @@
 
 static bool waiting = true;
 static bool addedJsLoadErrorObserver = false;
-UIView *splashScreen = nil;
+static UIView *loadingView = nil;
 
 @implementation RNSplashScreen
 - (dispatch_queue_t)methodQueue{
@@ -21,22 +21,27 @@ UIView *splashScreen = nil;
 RCT_EXPORT_MODULE(SplashScreen)
 
 + (void)show {
-    if (!waiting) {
-        NSArray *objects = [[NSBundle mainBundle] loadNibNamed:@"LaunchScreen" owner:self options:nil];
-        splashScreen = [objects objectAtIndex:0];
-        splashScreen.center = [[UIApplication sharedApplication].keyWindow convertPoint:[UIApplication sharedApplication].keyWindow.center fromWindow:[UIApplication sharedApplication].keyWindow];
-        [[UIApplication sharedApplication].keyWindow addSubview:splashScreen];
-    } else {
-        if (!addedJsLoadErrorObserver) {
-            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(jsLoadError:) name:RCTJavaScriptDidFailToLoadNotification object:nil];
-            addedJsLoadErrorObserver = true;
-        }
-        
-        while (waiting) {
-            NSDate* later = [NSDate dateWithTimeIntervalSinceNow:0.1];
-            [[NSRunLoop mainRunLoop] runUntilDate:later];
-        }
+    if (!addedJsLoadErrorObserver) {
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(jsLoadError:) name:RCTJavaScriptDidFailToLoadNotification object:nil];
+        addedJsLoadErrorObserver = true;
     }
+    
+    while (waiting) {
+        NSDate* later = [NSDate dateWithTimeIntervalSinceNow:0.1];
+        [[NSRunLoop mainRunLoop] runUntilDate:later];
+    }
+}
+
++ (void)showSplash:(NSString*)splashScreen inRootView:(UIView*)rootView {
+    if (!loadingView) {
+        loadingView = [[[NSBundle mainBundle] loadNibNamed:splashScreen owner:self options:nil] objectAtIndex:0];
+        CGRect frame = rootView.frame;
+        frame.origin = CGPointMake(0, 0);
+        loadingView.frame = frame;
+    }
+    waiting = false;
+    
+    [rootView addSubview:loadingView];
 }
 
 + (void)hide {
@@ -46,7 +51,9 @@ RCT_EXPORT_MODULE(SplashScreen)
                            waiting = false;
                        });
     } else {
-        [splashScreen removeFromSuperview];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [loadingView removeFromSuperview];
+        });
     }
 }
 
